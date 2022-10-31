@@ -112,7 +112,7 @@ readin(const char* filename)
         printErrMsg("Unexpected readin issue");
     }
       
-    myMap.length = size / 100;
+    myMap.length = size / RC_LEN;
     myMap.keys = keys_arr;
     myMap.followings = following_darr;
     munmap(ptr, size);
@@ -181,6 +181,7 @@ merge(struct map * myMap, int left, int mid, int right, int num_level_threads) {
         //printf("myMap->keys[left]: %d\n", myMap->keys[left]);
         myMap->followings[left++] = temp_following[copyIndex++];
     }
+    
     pthread_mutex_lock(&lock);
     current_finished_threads++;
     if (current_finished_threads >= num_level_threads)
@@ -245,8 +246,8 @@ main(int argc, char const *argv[])
         int num_threads = num_pieces > myMap.length ? myMap.length : num_pieces;
         // int last_alone = num_threads % 2 == 1;
         pthread_t threads[thread_no];                       // thread lists
-        struct arrsects args_arr[thread_no];             //arrsection arg wrapper
-        current_finished_threads = 0; // init current level
+        struct arrsects args_arr[thread_no];                //arrsection arg wrapper
+        current_finished_threads = 0;                       // init current level
 
         for(int i = 0; i < num_threads; i++) {
                 args_arr[i].section = i;
