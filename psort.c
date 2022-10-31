@@ -270,6 +270,7 @@ main(int argc, char const *argv[])
         pthread_mutex_lock(&lock);
         pthread_cond_wait(&condition_wait, &lock);
         pthread_mutex_unlock(&lock);
+        radius = radius * 2;
     }
 
     // printMap(&myMap);
