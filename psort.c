@@ -10,11 +10,21 @@
 
 #define RC_LEN 100 // length of each records
 
+// struct used to denote the map
 struct map {
     int *keys;
     int **followings;
     int length;
 };
+
+// strcture passed into the thread function
+struct arrsects{
+    int section; // which section of the arrary it is 
+    int l; // low index
+    int h; // high index
+};
+
+struct map myMap; // global myMap variable
 
 /**
  * Print the content of the map, used for debugging
@@ -52,16 +62,7 @@ printErrMsg(char* msg) {
     exit(1);
 }
 
-/**
- * Helper
- * @return number of processers available
-*/
-int 
-num_processor(void) {
-    return (get_nprocs());
-}
-
-struct map 
+void 
 readin(const char* filename)
 {
     // open the file
@@ -104,14 +105,12 @@ readin(const char* filename)
         }
         printErrMsg("Unexpected readin issue");
     }
-    
-    struct map myMap;
+      
     myMap.length = size / 100;
     myMap.keys = keys_arr;
     myMap.followings = following_darr;
     munmap(ptr, size);
     // printf("step 2\n");
-    return myMap;
 }
 
 void writeOut(const char* filename, struct map *myMap) {
@@ -141,7 +140,8 @@ void writeOut(const char* filename, struct map *myMap) {
 
 // TODO: Divide and Conquer method in parallelism
 
-void merge(struct map * myMap, int left, int mid, int right) {
+void 
+merge(struct map * myMap, int left, int mid, int right) {
     int left_current = left;
     int right_current = mid + 1;
 
@@ -177,7 +177,8 @@ void merge(struct map * myMap, int left, int mid, int right) {
     }
 }
 
-void mergeDivide(struct map * myMap, int left, int right) {
+void 
+mergeDivide(struct map * myMap, int left, int right) {
     if (left >= right)
         return ;
     int mid = (left + right) / 2;
@@ -188,26 +189,77 @@ void mergeDivide(struct map * myMap, int left, int right) {
     //printMap(myMap);
 }
 
-void mergeSort(struct map * myMap) {
-    int length = myMap->length;
-    mergeDivide(myMap, 0, length - 1);
+// void 
+// mergeSort(struct map * myMap) {
+//     int length = myMap->length;
+//     mergeDivide(myMap, 0, length - 1);
+// }
+
+void*
+thread_merge_sort(void* arg){
+    // determine parts of the array
+    struct arrsects * arg_sect = (struct arrsects *)arg;
+    int left = arg_sect->l;
+    int right = arg_sect->h;
+    // believe in mr. ye
+    mergeDivide(&myMap, left, right);
 }
 
-int main(int argc, char const *argv[])
+
+int 
+main(int argc, char const *argv[])
 {
     // const char* filename = argv[1];
     const char* filename = "output.bin";
     const char* output = "output2.bin";
-    struct map myMap = readin(filename);
-    printMap(&myMap);
-    printf("之后\n");
-    mergeSort(&myMap);
-    printMap(&myMap);
-    writeOut(output, &myMap);
-    freeMap(&myMap);
-    printf("终末\n");
-    struct map myMap2 = readin(output);
-    printf("再读：\n");
-    printMap(&myMap2);
+    
+    //initialize mymap
+    readin(filename);
+    
+    
+    
+    // concurrent speed-up
+    const int processor_no = get_nprocs();
+    const int thread_no = processor_no > myMap.length ? myMap.length : processor_no; 
+    pthread_t threads[thread_no];                       // thread lists
+    struct arrsects args_arr[thread_no];             //arrsection arg wrapper
+    int epthread = myMap.length/thread_no;           // elements per thread
+    
+    // create the threads
+    for(int i = 0; i < thread_no; i++){
+        args_arr[i].section = i;
+        args_arr[i].l = i * epthread;
+        args_arr[i].h = (i + 1) * epthread - 1;
+    
+        int rc = pthread_create(&threads[i], NULL, thread_merge_sort, (void*)(&args_arr[i]));
+        if(rc){
+            printErrMsg("Error while creating threads");
+            exit(1);
+        }
+    }
+    
+    // join the threads
+    for(int i = 0; i < thread_no; i++){
+        p_thread_join(threads[i], NULL);
+    }
+    
+    // merge the consequtive four pieces of arrays 
+    for(int i = 0; i < thread_no - 1; i++){ // merge (thread_no - 1) times
+        
+    }
+    
+
+
+
+    // printMap(&myMap);
+    // printf("之后\n");
+    // mergeSort(&myMap);
+    // printMap(&myMap);
+    // writeOut(output, &myMap);
+    // freeMap(&myMap);
+    // printf("终末\n");
+    // struct map myMap2 = readin(output);
+    // printf("再读：\n");
+    // printMap(&myMap2);
     return 0;
 }
