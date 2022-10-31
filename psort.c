@@ -7,6 +7,10 @@
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 
+#define FOW_LEN 96 // length of the following byte long elements
+#define KEY_LEN 4  // length of the key
+#define RC_LEN 100 // length of each records
+
 struct map {
     int *keys;
     int **followings;
@@ -40,12 +44,13 @@ freeMap(struct map * myMap) {
 }
 
 /**
+ * Helper
  * Print the error message
 */
 void 
 printErrMsg(char* msg) {
-    printf("panic! There is an error : %s\n", msg);
-    exit(20);
+    printf("%s\n", msg);
+    exit(1);
 }
 
 /**
@@ -60,22 +65,31 @@ num_processor(void) {
 struct map 
 readin(const char* filename)
 {
-    int file = open(filename, O_RDONLY);
+    // open the file
+    int fd = open(filename, O_RDONLY);
+    if(fd == -1){ // safety reasons
+        printf("open() syscall failed \n");
+        exit(1);
+    }
+    
+    // map file to memory, and read
     struct stat buffer;
-    fstat(file, &buffer);
-    int *ptr = mmap(NULL, buffer.st_size, PROT_READ, MAP_SHARED, file, 0);
-    // printf("sizeof char: %d \n", sizeof(char)); // should be 1
-    close(file);
-    // printf("step 1\n");
-    int* record_keys = malloc((buffer.st_size / 100 + 1) * sizeof(int)); // each 4-byte integer
-    int** record_followings = malloc((buffer.st_size / 100 + 1) * sizeof(int*)); // each 96-byte followings
+    fstat(fd, &buffer);
+    int size = buffer.st_size;
+    int *ptr = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0); // anti human, why not char*?
+    close(fd);
+    
+    // read the file
+    int* keys_arr = malloc((size / RC_LEN + 1) * sizeof(int)); // each 4-byte integer
+    int** d_following_arr = malloc((size / RC_LEN + 1) * sizeof(int*)); // each 96-byte followings
+    
     for (int i = 0; ptr[i] != '\0'; i++)
     {
         if (i % 25 == 0) {
             // DONE: get the key (4-byte int)
             // printf("key %d is %d\n", i, ptr[i]);
             int key = ptr[i];
-            record_keys[i / 25] = key;
+            keys_arr[i / 25] = key;
             continue;
         }
         if (i % 25 == 1) {
@@ -84,17 +98,17 @@ readin(const char* filename)
             for (int j = 0; j < 96/sizeof(int); j ++) {
                 following[j] = ptr[i + j];
             }
-            record_followings[i / 25] = following;
+            d_following_arr[i / 25] = following;
             i += 23;
             continue;
         }
-        printErrMsg("你不可能达到这里，除非文件有问题或者我有问题！");
-        // memcpy(data, ptr, 4);
+        printErrMsg("Unexpected readin issue");
     }
+    
     struct map myMap;
     myMap.length = buffer.st_size / 100;
-    myMap.keys = record_keys;
-    myMap.followings = record_followings;
+    myMap.keys = keys_arr;
+    myMap.followings = d_following_arr;
     munmap(ptr, buffer.st_size);
     // printf("step 2\n");
     return myMap;
@@ -123,17 +137,6 @@ void writeOut(const char* filename, struct map *myMap) {
     fwrite(&copy, 4, length * 25, fp);
     fflush(fp);
     fclose(fp);
-    /*
-    lseek(file, length * 100, SEEK_END);
-    write(file, "", 1);
-    char *ptr = mmap(NULL, length * 100 + 1, PROT_READ | PROT_WRITE, MAP_SHARED, file, 0);
-    
-    memcpy(ptr, copy, length * 100);
-    msync(ptr, length * 100, MS_SYNC);
-    fsync(file);
-    munmap(ptr, length * 100 );
-    */
-    
 }
 
 // TODO: Divide and Conquer method in parallelism
