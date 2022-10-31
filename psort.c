@@ -7,8 +7,7 @@
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 
-#define FOW_LEN 96 // length of the following byte long elements
-#define KEY_LEN 4  // length of the key
+
 #define RC_LEN 100 // length of each records
 
 struct map {
@@ -76,12 +75,13 @@ readin(const char* filename)
     struct stat buffer;
     fstat(fd, &buffer);
     int size = buffer.st_size;
-    int *ptr = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0); // anti human, why not char*?
+    int *ptr = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
     close(fd);
     
     // read the file
-    int* keys_arr = malloc((size / RC_LEN + 1) * sizeof(int)); // each 4-byte integer
-    int** d_following_arr = malloc((size / RC_LEN + 1) * sizeof(int*)); // each 96-byte followings
+    int rc_no = size/RC_LEN + 1;
+    int* keys_arr = malloc(rc_no * sizeof(int)); // each 4-byte integer
+    int** following_darr = malloc(rc_no * sizeof(int*)); // each 96-byte followings
     
     for (int i = 0; ptr[i] != '\0'; i++)
     {
@@ -98,7 +98,7 @@ readin(const char* filename)
             for (int j = 0; j < 96/sizeof(int); j ++) {
                 following[j] = ptr[i + j];
             }
-            d_following_arr[i / 25] = following;
+            following_darr[i / 25] = following;
             i += 23;
             continue;
         }
@@ -106,10 +106,10 @@ readin(const char* filename)
     }
     
     struct map myMap;
-    myMap.length = buffer.st_size / 100;
+    myMap.length = size / 100;
     myMap.keys = keys_arr;
-    myMap.followings = d_following_arr;
-    munmap(ptr, buffer.st_size);
+    myMap.followings = following_darr;
+    munmap(ptr, size);
     // printf("step 2\n");
     return myMap;
 }
