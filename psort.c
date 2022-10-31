@@ -86,11 +86,10 @@ struct map readin(const char* filename)
 }
 
 void writeOut(const char* filename, struct map *myMap) {
-    int file = open(filename, O_RDWR | O_CREAT, (mode_t)0600);
+    FILE *fp;
+    fp = fopen(filename, "w");
+    int file = fileno(fp);
     int length = myMap->length;
-    // lseek(file, length * 100, SEEK_END);
-    // write(file, "", 1);
-    char *ptr = mmap(NULL, length * 100 + 1, PROT_READ | PROT_WRITE, MAP_SHARED, file, 0);
     int copy[length * 25];
     for (int i = 0; i < length * 25; i ++)
     {
@@ -106,11 +105,20 @@ void writeOut(const char* filename, struct map *myMap) {
             i += 23;
         }
     }
+    fwrite(&copy, 4, length * 25, fp);
+    fflush(fp);
+    fclose(fp);
+    /*
+    lseek(file, length * 100, SEEK_END);
+    write(file, "", 1);
+    char *ptr = mmap(NULL, length * 100 + 1, PROT_READ | PROT_WRITE, MAP_SHARED, file, 0);
+    
     memcpy(ptr, copy, length * 100);
     msync(ptr, length * 100, MS_SYNC);
     fsync(file);
     munmap(ptr, length * 100 );
-    close(file);
+    */
+    
 }
 
 // TODO: Divide and Conquer method in parallelism
@@ -181,7 +189,7 @@ int main(int argc, char const *argv[])
     freeMap(&myMap);
     printf("终末\n");
     struct map myMap2 = readin(output);
-    printf("再读进来：\n");
+    printf("再读：\n");
     printMap(&myMap2);
     return 0;
 }
