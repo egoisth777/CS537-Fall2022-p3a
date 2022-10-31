@@ -13,7 +13,11 @@ struct map {
     int length;
 };
 
-void printMap(struct map * myMap) {
+/**
+ * Print the content of the map, used for debugging
+*/
+void 
+printMap(struct map * myMap) {
 
     printf("psort.map(\n");
     int length = myMap->length;
@@ -26,7 +30,8 @@ void printMap(struct map * myMap) {
     printf(")\n");
 }
 
-void freeMap(struct map * myMap) {
+void 
+freeMap(struct map * myMap) {
     int length = myMap->length;
     free(myMap->keys);
     for(int i = 0; i < length; i ++)
@@ -34,16 +39,26 @@ void freeMap(struct map * myMap) {
     free(myMap->followings);
 }
 
-void panic(char* msg) {
+/**
+ * Print the error message
+*/
+void 
+printErrMsg(char* msg) {
     printf("panic! There is an error : %s\n", msg);
     exit(20);
 }
 
-int num_processor(void) {
+/**
+ * Helper
+ * @return number of processers available
+*/
+int 
+num_processor(void) {
     return (get_nprocs());
 }
 
-struct map readin(const char* filename)
+struct map 
+readin(const char* filename)
 {
     int file = open(filename, O_RDONLY);
     struct stat buffer;
@@ -54,7 +69,7 @@ struct map readin(const char* filename)
     // printf("step 1\n");
     int* record_keys = malloc((buffer.st_size / 100 + 1) * sizeof(int)); // each 4-byte integer
     int** record_followings = malloc((buffer.st_size / 100 + 1) * sizeof(int*)); // each 96-byte followings
-    for (int i = 0; ptr[i] != '\0'; i ++)
+    for (int i = 0; ptr[i] != '\0'; i++)
     {
         if (i % 25 == 0) {
             // DONE: get the key (4-byte int)
@@ -73,7 +88,7 @@ struct map readin(const char* filename)
             i += 23;
             continue;
         }
-        panic("你不可能达到这里，除非文件有问题或者我有问题！");
+        printErrMsg("你不可能达到这里，除非文件有问题或者我有问题！");
         // memcpy(data, ptr, 4);
     }
     struct map myMap;
