@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
+#include <pthread.h>
 
 
 #define RC_LEN 100 // length of each records
@@ -22,9 +23,14 @@ struct arrsects{
     int section; // which section of the arrary it is 
     int l; // low index
     int h; // high index
+    int num_level_thread; // total number of threads of current level
 };
 
 struct map myMap; // global myMap variable
+int current_finished_threads;
+// mutex: wait for current level child threads
+pthread_cond_t condition_wait = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * Print the content of the map, used for debugging
@@ -141,7 +147,7 @@ void writeOut(const char* filename, struct map *myMap) {
 // TODO: Divide and Conquer method in parallelism
 
 void 
-merge(struct map * myMap, int left, int mid, int right) {
+merge(struct map * myMap, int left, int mid, int right, int num_level_threads) {
     int left_current = left;
     int right_current = mid + 1;
 
@@ -175,8 +181,14 @@ merge(struct map * myMap, int left, int mid, int right) {
         //printf("myMap->keys[left]: %d\n", myMap->keys[left]);
         myMap->followings[left++] = temp_following[copyIndex++];
     }
+    pthread_mutex_lock(&lock);
+    current_finished_threads++;
+    if (current_finished_threads >= num_level_threads)
+        pthread_cond_signal(&condition_wait);
+    pthread_mutex_unlock(&lock);
 }
 
+/*
 void 
 mergeDivide(struct map * myMap, int left, int right) {
     if (left >= right)
@@ -188,7 +200,7 @@ mergeDivide(struct map * myMap, int left, int right) {
     //printf("after merge: map: \n");
     //printMap(myMap);
 }
-
+*/
 // void 
 // mergeSort(struct map * myMap) {
 //     int length = myMap->length;
@@ -202,7 +214,8 @@ thread_merge_sort(void* arg){
     int left = arg_sect->l;
     int right = arg_sect->h;
     // believe in mr. ye
-    mergeDivide(&myMap, left, right);
+    // mergeDivide(&myMap, left, right);
+    merge(&myMap, left, (left + right) / 2, right, arg_sect->num_level_thread);
 }
 
 
@@ -216,40 +229,48 @@ main(int argc, char const *argv[])
     //initialize mymap
     readin(filename);
     
-    
-    
     // concurrent speed-up
     const int processor_no = get_nprocs();
     const int thread_no = processor_no > myMap.length ? myMap.length : processor_no; 
-    pthread_t threads[thread_no];                       // thread lists
-    struct arrsects args_arr[thread_no];             //arrsection arg wrapper
     int epthread = myMap.length/thread_no;           // elements per thread
     
-    // create the threads
-    for(int i = 0; i < thread_no; i++){
-        args_arr[i].section = i;
-        args_arr[i].l = i * epthread;
-        args_arr[i].h = (i + 1) * epthread - 1;
-    
-        int rc = pthread_create(&threads[i], NULL, thread_merge_sort, (void*)(&args_arr[i]));
-        if(rc){
-            printErrMsg("Error while creating threads");
-            exit(1);
-        }
-    }
-    
-    // join the threads
-    for(int i = 0; i < thread_no; i++){
-        p_thread_join(threads[i], NULL);
-    }
-    
+    // radius size -> begin with epthread, * 2 each time, eventually come to myMap.length
+    // imagine first radius = 6 (length = 20, thread_no = 3)
+    int radius = epthread;
+
     // @TODO: merge the consequtive four pieces of arrays 
-    for(int i = 0; i < thread_no - 1; i++){ // merge (thread_no - 1) times
-        
+    while(radius < myMap.length) { // merge (thread_no - 1) times
+        // int last_round = radius * 2 >= myMap.length ? 1 : 0;
+        int num_pieces = myMap.length / radius;
+        int num_threads = num_pieces > myMap.length ? myMap.length : num_pieces;
+        // int last_alone = num_threads % 2 == 1;
+        pthread_t threads[thread_no];                       // thread lists
+        struct arrsects args_arr[thread_no];             //arrsection arg wrapper
+        current_finished_threads = 0; // init current level
+
+        for(int i = 0; i < num_threads; i++) {
+                args_arr[i].section = i;
+                args_arr[i].l = i * radius;
+                args_arr[i].num_level_thread = num_threads;
+                if (i == num_threads - 1)
+                    args_arr[i].h = myMap.length - 1;
+                else
+                    args_arr[i].h = (i + 1) * radius - 1;
+            
+                int rc = pthread_create(&threads[i], NULL, thread_merge_sort, (void*)(&args_arr[i]));
+                if(rc){
+                    printErrMsg("Error while creating threads");
+                    exit(1);
+                }
+        }
+        // join the threads
+        for(int i = 0; i < num_threads; i++){
+            pthread_join(threads[i], NULL);
+        }
+        pthread_mutex_lock(&lock);
+        pthread_cond_wait(&condition_wait, &lock);
+        pthread_mutex_unlock(&lock);
     }
-    
-
-
 
     // printMap(&myMap);
     // printf("之后\n");
