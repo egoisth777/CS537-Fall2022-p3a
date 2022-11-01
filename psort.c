@@ -225,7 +225,6 @@ merge2(struct map * myMap, int left, int mid, int right) {
     }
 }
 
-
 void 
 mergeDivide(struct map * myMap, int left, int right) {
     if (left >= right)
@@ -276,14 +275,15 @@ void mt_thread_sort() {
     // radius size -> begin with epthread, * 2 each time, eventually come to myMap.length
     // imagine first radius = 6 (length = 20, thread_no = 3)
 
+    pthread_t threads[thread_no];                       // thread lists
+    struct arrsects args_arr[thread_no];             //arrsection arg wrapper
+
     // @TODO: merge the consequtive four pieces of arrays 
     while(radius < myMap.length) { // merge (thread_no - 1) times
         // int last_round = radius * 2 >= myMap.length ? 1 : 0;
         int num_pieces = myMap.length / radius;
         int num_threads = num_pieces > myMap.length ? myMap.length : num_pieces;
         // int last_alone = num_threads % 2 == 1;
-        pthread_t threads[thread_no];                       // thread lists
-        struct arrsects args_arr[thread_no];             //arrsection arg wrapper
         current_finished_threads = 0; // init current level
 
         for(int i = 0; i < num_threads; i++) {
