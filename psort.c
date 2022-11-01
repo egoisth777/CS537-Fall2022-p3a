@@ -269,7 +269,7 @@ void mt_thread_sort() {
     // concurrent speed-up
     const int processor_no = get_nprocs();
     const int thread_no = processor_no > myMap.length ? myMap.length : processor_no; 
-    int radius = myMap.length/thread_no;           // elements per thread
+    int radius = myMap.length % thread_no > 0 ?  myMap.length / thread_no + 1 : myMap.length / thread_no;           // elements per thread
     int initrun = 1;
     int merge_smaller = 0;
     int last_round = 0;
@@ -325,7 +325,7 @@ int
 main(int argc, char const *argv[])
 {
     // const char* filename = argv[1];
-    const char* filename = "output_extreme.bin";
+    const char* filename = "input5.bin";
     const char* output = "output2.bin";
     
     //initialize mymap
