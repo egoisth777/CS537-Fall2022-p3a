@@ -272,7 +272,6 @@ void mt_thread_sort() {
     int radius = myMap.length/thread_no;           // elements per thread
     int initrun = 1;
     int merge_smaller = 0;
-    int should_merge = 1;
     int last_round = 0;
 
     // radius size -> begin with epthread, * 2 each time, eventually come to myMap.length
@@ -308,15 +307,15 @@ void mt_thread_sort() {
         while (current_finished_threads < num_threads)
             pthread_cond_wait(&condition_wait, &lock);
         pthread_mutex_unlock(&lock);
+        printMap(&myMap);
         initrun = 0;
         last_round = (myMap.length % radius > 0 && radius * 2 >= myMap.length) ? 1 : 0;
-        radius = radius * 2;
-        merge_smaller = (myMap.length % radius > 0 && radius * 2 >= myMap.length && myMap.length - radius > radius / 2) ? 1 : 0;
-        if (merge_smaller == 1 && should_merge == 1) {
-            merge2(&myMap, radius, radius + (radius / 2 - 1), myMap.length - 1);
-            should_merge = 0;
+        merge_smaller = (myMap.length % radius > 0) ? 1 : 0;
+        if (merge_smaller == 1) {
+            merge2(&myMap, (myMap.length / radius - 1) * radius, (myMap.length / radius) * radius - 1, myMap.length - 1);
         }
-        printMap(&myMap);
+        radius = radius * 2;
+        
     }
     if (last_round == 1)
         merge2(&myMap, 0, 0 + (radius / 2 - 1), myMap.length - 1);
