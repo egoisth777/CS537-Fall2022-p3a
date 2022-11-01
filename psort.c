@@ -271,6 +271,9 @@ void mt_thread_sort() {
     const int thread_no = processor_no > myMap.length ? myMap.length : processor_no; 
     int radius = myMap.length/thread_no;           // elements per thread
     int initrun = 1;
+    int merge_smaller = 0;
+    int should_merge = 1;
+    int last_round = 0;
 
     // radius size -> begin with epthread, * 2 each time, eventually come to myMap.length
     // imagine first radius = 6 (length = 20, thread_no = 3)
@@ -290,10 +293,7 @@ void mt_thread_sort() {
                 args_arr[i].section = i;
                 args_arr[i].l = i * radius;
                 args_arr[i].num_level_thread = num_threads;
-                if (i == num_threads - 1)
-                    args_arr[i].h = myMap.length - 1;
-                else
-                    args_arr[i].h = (i + 1) * radius - 1;
+                args_arr[i].h = (i + 1) * radius - 1;
                 int rc;
                 if (initrun == 1)
                     rc = pthread_create(&threads[i], NULL, thread_merge_divide, (void*)(&args_arr[i]));
@@ -309,16 +309,24 @@ void mt_thread_sort() {
             pthread_cond_wait(&condition_wait, &lock);
         pthread_mutex_unlock(&lock);
         initrun = 0;
+        last_round = (myMap.length % radius > 0 && radius * 2 >= myMap.length) ? 1 : 0;
         radius = radius * 2;
+        merge_smaller = (myMap.length % radius > 0 && radius * 2 >= myMap.length && myMap.length - radius > radius / 2) ? 1 : 0;
+        if (merge_smaller == 1 && should_merge == 1) {
+            merge2(&myMap, radius, radius + (radius / 2 - 1), myMap.length - 1);
+            should_merge = 0;
+        }
         printMap(&myMap);
     }
+    if (last_round == 1)
+        merge2(&myMap, 0, 0 + (radius / 2 - 1), myMap.length - 1);
 }
 
 int 
 main(int argc, char const *argv[])
 {
     // const char* filename = argv[1];
-    const char* filename = "output.bin";
+    const char* filename = "output_extreme.bin";
     const char* output = "output2.bin";
     
     //initialize mymap
