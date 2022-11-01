@@ -112,7 +112,7 @@ readin(const char* filename)
         printErrMsg("Unexpected readin issue");
     }
       
-    myMap.length = size / RC_LEN;
+    myMap.length = size / 100;
     myMap.keys = keys_arr;
     myMap.followings = following_darr;
     munmap(ptr, size);
@@ -144,7 +144,7 @@ void writeOut(const char* filename, struct map *myMap) {
     fclose(fp);
 }
 
-// TODO: Divide and Conquer method in parallelism
+// Divide and Conquer method in parallelism
 
 void 
 merge(struct map * myMap, int left, int mid, int right, int num_level_threads) {
@@ -181,7 +181,6 @@ merge(struct map * myMap, int left, int mid, int right, int num_level_threads) {
         //printf("myMap->keys[left]: %d\n", myMap->keys[left]);
         myMap->followings[left++] = temp_following[copyIndex++];
     }
-    
     pthread_mutex_lock(&lock);
     current_finished_threads++;
     if (current_finished_threads >= num_level_threads)
@@ -189,7 +188,44 @@ merge(struct map * myMap, int left, int mid, int right, int num_level_threads) {
     pthread_mutex_unlock(&lock);
 }
 
-/*
+void 
+merge2(struct map * myMap, int left, int mid, int right) {
+    int left_current = left;
+    int right_current = mid + 1;
+
+    int temp[right - left + 1];
+    int *temp_following[right - left + 1];
+    int current_index = 0;
+
+    // 神的代碼
+    while(left_current <= mid && right_current <= right) {
+        //printf("myMap->keys[left_current]: %d\n", myMap->keys[left_current]);
+        //printf("myMap->keys[right_current]: %d\n", myMap->keys[right_current]);
+
+        temp[current_index] = myMap->keys[left_current] < myMap->keys[right_current] ? myMap->keys[left_current] : myMap->keys[right_current];
+        temp_following[current_index++] = myMap->keys[left_current] < myMap->keys[right_current] ? myMap->followings[left_current++] : myMap->followings[right_current++];
+    }
+
+    while(left_current <= mid) {
+        temp[current_index] = myMap->keys[left_current];
+        temp_following[current_index++] = myMap->followings[left_current++];
+    }
+
+    while(right_current <= right) {
+        temp[current_index] = myMap->keys[right_current];
+        temp_following[current_index++] = myMap->followings[right_current++];
+    }
+    int copyIndex = 0;
+    while (left <= right)
+    {
+        //printf("temp[copyIndex] %d\n", temp[copyIndex]);
+        myMap->keys[left] = temp[copyIndex];
+        //printf("myMap->keys[left]: %d\n", myMap->keys[left]);
+        myMap->followings[left++] = temp_following[copyIndex++];
+    }
+}
+
+
 void 
 mergeDivide(struct map * myMap, int left, int right) {
     if (left >= right)
@@ -197,16 +233,10 @@ mergeDivide(struct map * myMap, int left, int right) {
     int mid = (left + right) / 2;
     mergeDivide(myMap, left, mid);
     mergeDivide(myMap, mid + 1, right);
-    merge(myMap, left, mid, right);
+    merge2(myMap, left, mid, right);
     //printf("after merge: map: \n");
     //printMap(myMap);
 }
-*/
-// void 
-// mergeSort(struct map * myMap) {
-//     int length = myMap->length;
-//     mergeDivide(myMap, 0, length - 1);
-// }
 
 void*
 thread_merge_sort(void* arg){
@@ -219,21 +249,30 @@ thread_merge_sort(void* arg){
     merge(&myMap, left, (left + right) / 2, right, arg_sect->num_level_thread);
 }
 
+void*
+thread_merge_divide(void* arg){
+    // determine parts of the array
+    struct arrsects * arg_sect = (struct arrsects *)arg;
+    int left = arg_sect->l;
+    int right = arg_sect->h;
+    // believe in mr. ye
+    mergeDivide(&myMap, left, right);
+    pthread_mutex_lock(&lock);
+    current_finished_threads++;
+    // printf("current finished num:%d\n", current_finished_threads);
+    if (current_finished_threads >= arg_sect->num_level_thread)
+        pthread_cond_signal(&condition_wait);
+    pthread_mutex_unlock(&lock);
+    return NULL;
+}
 
-int 
-main(int argc, char const *argv[])
-{
-    // const char* filename = argv[1];
-    const char* filename = "output.bin";
-    const char* output = "output2.bin";
-    
-    //initialize mymap
-    readin(filename);
-    
+void mt_thread_sort() {
     // concurrent speed-up
     const int processor_no = get_nprocs();
     const int thread_no = processor_no > myMap.length ? myMap.length : processor_no; 
     int epthread = myMap.length/thread_no;           // elements per thread
+    int initrun = 1;
+
     
     // radius size -> begin with epthread, * 2 each time, eventually come to myMap.length
     // imagine first radius = 6 (length = 20, thread_no = 3)
@@ -246,8 +285,8 @@ main(int argc, char const *argv[])
         int num_threads = num_pieces > myMap.length ? myMap.length : num_pieces;
         // int last_alone = num_threads % 2 == 1;
         pthread_t threads[thread_no];                       // thread lists
-        struct arrsects args_arr[thread_no];                //arrsection arg wrapper
-        current_finished_threads = 0;                       // init current level
+        struct arrsects args_arr[thread_no];             //arrsection arg wrapper
+        current_finished_threads = 0; // init current level
 
         for(int i = 0; i < num_threads; i++) {
                 args_arr[i].section = i;
@@ -257,28 +296,39 @@ main(int argc, char const *argv[])
                     args_arr[i].h = myMap.length - 1;
                 else
                     args_arr[i].h = (i + 1) * radius - 1;
-            
-                int rc = pthread_create(&threads[i], NULL, thread_merge_sort, (void*)(&args_arr[i]));
+                int rc;
+                if (initrun == 1)
+                    rc = pthread_create(&threads[i], NULL, thread_merge_divide, (void*)(&args_arr[i]));
+                else
+                    rc = pthread_create(&threads[i], NULL, thread_merge_sort, (void*)(&args_arr[i]));
                 if(rc){
                     printErrMsg("Error while creating threads");
                     exit(1);
                 }
         }
-        // join the threads
-        for(int i = 0; i < num_threads; i++){
-            pthread_join(threads[i], NULL);
-        }
         pthread_mutex_lock(&lock);
-        pthread_cond_wait(&condition_wait, &lock);
+        while (current_finished_threads < num_threads)
+            pthread_cond_wait(&condition_wait, &lock);
         pthread_mutex_unlock(&lock);
         radius = radius * 2;
+        // printMap(&myMap);
     }
+}
 
-    // printMap(&myMap);
-    // printf("之后\n");
-    // mergeSort(&myMap);
-    // printMap(&myMap);
-    // writeOut(output, &myMap);
+int 
+main(int argc, char const *argv[])
+{
+    // const char* filename = argv[1];
+    const char* filename = "output_extreme.bin";
+    const char* output = "output2.bin";
+    
+    //initialize mymap
+    readin(filename);
+    printMap(&myMap);
+    printf("之后\n");
+    mt_thread_sort();
+    printMap(&myMap);
+    //writeOut(output, &myMap);
     // freeMap(&myMap);
     // printf("终末\n");
     // struct map myMap2 = readin(output);
