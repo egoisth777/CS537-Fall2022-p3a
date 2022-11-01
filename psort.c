@@ -270,13 +270,11 @@ void mt_thread_sort() {
     // concurrent speed-up
     const int processor_no = get_nprocs();
     const int thread_no = processor_no > myMap.length ? myMap.length : processor_no; 
-    int epthread = myMap.length/thread_no;           // elements per thread
+    int radius = myMap.length/thread_no;           // elements per thread
     int initrun = 1;
 
-    
     // radius size -> begin with epthread, * 2 each time, eventually come to myMap.length
     // imagine first radius = 6 (length = 20, thread_no = 3)
-    int radius = epthread;
 
     // @TODO: merge the consequtive four pieces of arrays 
     while(radius < myMap.length) { // merge (thread_no - 1) times
@@ -310,8 +308,9 @@ void mt_thread_sort() {
         while (current_finished_threads < num_threads)
             pthread_cond_wait(&condition_wait, &lock);
         pthread_mutex_unlock(&lock);
+        initrun = 0;
         radius = radius * 2;
-        // printMap(&myMap);
+        printMap(&myMap);
     }
 }
 
@@ -319,7 +318,7 @@ int
 main(int argc, char const *argv[])
 {
     // const char* filename = argv[1];
-    const char* filename = "output_extreme.bin";
+    const char* filename = "output.bin";
     const char* output = "output2.bin";
     
     //initialize mymap
