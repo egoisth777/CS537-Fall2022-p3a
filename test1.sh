@@ -5,8 +5,8 @@ psort ./inputfiles/input1.bin
 diff output1.bin output2.bin
 ret=$?
 if [[ $ret -eq 0 ]]; then
-    echo "passed."
+    echo "test 1 passed."
 else
-    echo "failed."
+    echo "test 1 failed."
 fi
 rm -r output1.bin output2.bin
