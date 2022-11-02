@@ -308,9 +308,13 @@ void mt_thread_sort() {
             pthread_cond_wait(&condition_wait, &lock);
         pthread_mutex_unlock(&lock);
         // printMap(&myMap);
-        initrun = 0;
+        if (initrun == 1 && myMap.length % radius > 0)
+        {
+            initrun = 0;
+            mergeDivide(&myMap, (myMap.length / radius) * radius, myMap.length - 1);
+        }
         last_round = (myMap.length % radius > 0 && radius * 2 >= myMap.length) ? 1 : 0;
-        merge_smaller = (myMap.length % radius > 0) ? 1 : 0;
+        merge_smaller = (initrun == 0 && myMap.length % radius > 0) ? 1 : 0;
         if (merge_smaller == 1) {
             merge2(&myMap, (myMap.length / radius - 1) * radius, (myMap.length / radius) * radius - 1, myMap.length - 1);
         }
@@ -326,7 +330,7 @@ main(int argc, char const *argv[])
 {
     const char* filename = argv[1];
     // const char* filename = "input5.bin";
-    const char* output1 = "output1.bin";
+    const char* output1 = argv[2];
     
     //initialize mymap
     readin(filename);

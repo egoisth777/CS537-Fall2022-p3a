@@ -201,7 +201,7 @@ main(int argc, char const *argv[])
 {
     const char* filename = argv[1];
     // const char* filename = "output.bin";
-    const char* output = "output2.bin";
+    const char* output = argv[2];
     struct map myMap = readin(filename); // readin the map
     // printMap(&myMap);
     // printf("之后\n");
