@@ -117,7 +117,7 @@ readin(const char* filename)
 void writeOut(const char* filename, struct map *myMap) {
     FILE *fp;
     fp = fopen(filename, "w");
-    int file = fileno(fp);
+    // int file = fileno(fp);
     int length = myMap->length;
     int copy[length * 25];
     for (int i = 0; i < length * 25; i ++)
@@ -199,19 +199,20 @@ mergeSort(struct map * myMap) {
 int 
 main(int argc, char const *argv[])
 {
-    // const char* filename = argv[1];
-    const char* filename = "output.bin";
+    const char* filename = argv[1];
+    // const char* filename = "output.bin";
     const char* output = "output2.bin";
     struct map myMap = readin(filename); // readin the map
-    printMap(&myMap);
-    printf("之后\n");
+    // printMap(&myMap);
+    // printf("之后\n");
     mergeSort(&myMap);
-    printMap(&myMap);
     writeOut(output, &myMap);
-    freeMap(&myMap);
-    printf("终末\n");
-    struct map myMap2 = readin(output);
-    printf("再读：\n");
-    printMap(&myMap2);
+    // printMap(&myMap);
+    // writeOut(output, &myMap);
+    // freeMap(&myMap);
+    // printf("终末\n");
+    // struct map myMap2 = readin(output);
+    // printf("再读：\n");
+    // printMap(&myMap2);
     return 0;
 }

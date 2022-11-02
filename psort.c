@@ -122,7 +122,7 @@ readin(const char* filename)
 void writeOut(const char* filename, struct map *myMap) {
     FILE *fp;
     fp = fopen(filename, "w");
-    int file = fileno(fp);
+    // int file = fileno(fp);
     int length = myMap->length;
     int copy[length * 25];
     for (int i = 0; i < length * 25; i ++)
@@ -307,7 +307,7 @@ void mt_thread_sort() {
         while (current_finished_threads < num_threads)
             pthread_cond_wait(&condition_wait, &lock);
         pthread_mutex_unlock(&lock);
-        printMap(&myMap);
+        // printMap(&myMap);
         initrun = 0;
         last_round = (myMap.length % radius > 0 && radius * 2 >= myMap.length) ? 1 : 0;
         merge_smaller = (myMap.length % radius > 0) ? 1 : 0;
@@ -324,21 +324,16 @@ void mt_thread_sort() {
 int 
 main(int argc, char const *argv[])
 {
-    // const char* filename = argv[1];
-    const char* filename = "input5.bin";
-    const char* output = "output2.bin";
+    const char* filename = argv[1];
+    // const char* filename = "input5.bin";
+    const char* output1 = "output1.bin";
     
     //initialize mymap
     readin(filename);
-    printMap(&myMap);
-    printf("之后\n");
+    // printMap(&myMap);
+    // printf("之后\n");
     mt_thread_sort();
-    printMap(&myMap);
-    //writeOut(output, &myMap);
-    // freeMap(&myMap);
-    // printf("终末\n");
-    // struct map myMap2 = readin(output);
-    // printf("再读：\n");
-    // printMap(&myMap2);
+    writeOut(output1, &myMap);
+    // printMap(&myMap);
     return 0;
 }
