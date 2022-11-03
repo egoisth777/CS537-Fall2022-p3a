@@ -24,14 +24,10 @@ struct arrsects
     int section;          // which section of the arrary it is
     int l;                // low index
     int h;                // high index
-    int num_level_thread; // total number of threads of current level
+    int mid; // total number of threads of current level
 };
 
 struct map myMap; // global myMap variable
-int current_finished_threads;
-// mutex: wait for current level child threads
-pthread_cond_t condition_wait = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * Print the content of the map, used for debugging
@@ -149,8 +145,10 @@ void writeOut(const char *filename, struct map *myMap)
     fclose(fp);
 }
 
-// Divide and Conquer method in parallelism
 
+/**
+ * Single Threaded merge
+*/
 void merge(struct map *myMap, int left, int mid, int right)
 {
     int left_current = left;
@@ -160,12 +158,8 @@ void merge(struct map *myMap, int left, int mid, int right)
     int *temp_following[right - left + 1];
     int current_index = 0;
 
-    // 神的代碼
     while (left_current <= mid && right_current <= right)
     {
-        // printf("myMap->keys[left_current]: %d\n", myMap->keys[left_current]);
-        // printf("myMap->keys[right_current]: %d\n", myMap->keys[right_current]);
-
         temp[current_index] = myMap->keys[left_current] < myMap->keys[right_current] ? myMap->keys[left_current] : myMap->keys[right_current];
         temp_following[current_index++] = myMap->keys[left_current] < myMap->keys[right_current] ? myMap->followings[left_current++] : myMap->followings[right_current++];
     }
@@ -191,87 +185,48 @@ void merge(struct map *myMap, int left, int mid, int right)
     }
 }
 
-void merge2(struct map *myMap, int left, int mid, int right)
-{
-    int left_current = left;
-    int right_current = mid + 1;
-
-    int temp[right - left + 1];
-    int *temp_following[right - left + 1];
-    int current_index = 0;
-
-    // 神的代碼
-    while (left_current <= mid && right_current <= right)
-    {
-        // printf("myMap->keys[left_current]: %d\n", myMap->keys[left_current]);
-        // printf("myMap->keys[right_current]: %d\n", myMap->keys[right_current]);
-
-        temp[current_index] = myMap->keys[left_current] < myMap->keys[right_current] ? myMap->keys[left_current] : myMap->keys[right_current];
-        temp_following[current_index++] = myMap->keys[left_current] < myMap->keys[right_current] ? myMap->followings[left_current++] : myMap->followings[right_current++];
-    }
-
-    while (left_current <= mid)
-    {
-        temp[current_index] = myMap->keys[left_current];
-        temp_following[current_index++] = myMap->followings[left_current++];
-    }
-
-    while (right_current <= right)
-    {
-        temp[current_index] = myMap->keys[right_current];
-        temp_following[current_index++] = myMap->followings[right_current++];
-    }
-    int copyIndex = 0;
-    while (left <= right)
-    {
-        // printf("temp[copyIndex] %d\n", temp[copyIndex]);
-        myMap->keys[left] = temp[copyIndex];
-        // printf("myMap->keys[left]: %d\n", myMap->keys[left]);
-        myMap->followings[left++] = temp_following[copyIndex++];
-    }
-}
-
-void mergeDivide(struct map *myMap, int left, int right)
+/**
+ * Single Threaded merge Sort
+*/
+void 
+mergeSort(struct map *myMap, int left, int right)
 {
     if (left >= right)
         return;
     int mid = (left + right) / 2;
-    mergeDivide(myMap, left, mid);
-    mergeDivide(myMap, mid + 1, right);
-    merge2(myMap, left, mid, right);
+    mergeSort(myMap, left, mid);
+    mergeSort(myMap, mid + 1, right);
+    merge(myMap, left, mid, right);
     // printf("after merge: map: \n");
     // printMap(myMap);
 }
 
-void *
-thread_merge_sort(void *arg)
-{
+void*
+thread_merge_sort(void* arg){
     // determine parts of the array
-    struct arrsects *arg_sect = (struct arrsects *)arg;
-    int left = arg_sect->l;
-    int right = arg_sect->h;
-    // call merge to merge the two sections
-    merge(&myMap, left, (left + right) / 2, right);
-}
-
-void *
-thread_merge_divide(void *arg)
-{
-    // determine parts of the array
-    struct arrsects *arg_sect = (struct arrsects *)arg;
+    struct arrsects * arg_sect = (struct arrsects *)arg;
     int left = arg_sect->l;
     int right = arg_sect->h;
     // believe in mr. ye
-    mergeDivide(&myMap, left, right);
-    pthread_mutex_lock(&lock);
-    current_finished_threads++;
-    // printf("current finished num:%d\n", current_finished_threads);
-    if (current_finished_threads >= arg_sect->num_level_thread)
-        pthread_cond_signal(&condition_wait);
-    pthread_mutex_unlock(&lock);
+    mergeSort(&myMap, left, right);
     return NULL;
 }
 
+void *
+thread_merge(void *arg)
+{
+    // determine parts of the array
+    struct arrsects *arg_sect = (struct arrsects *)arg;
+    int left = arg_sect->l;
+    int right = arg_sect->h;
+    int mid = arg_sect->mid;
+    // call merge to merge the two sections
+    merge(&myMap, left, mid, right);
+}
+
+/**
+ * do the actual merge sort
+*/
 void mt_thread_sort()
 {
     // concurrent speed-up
@@ -283,7 +238,7 @@ void mt_thread_sort()
     pthread_t threads[thread_no];        // thread lists
     struct arrsects args_arr[thread_no]; // arrsection arg wrapper
 
-    printf("processor_no: %d \n", processor_no);
+    // printf("processor_no: %d \n", processor_no);
 
     // assign sort mission to thread_no of threads
     for (int i = 0; i < thread_no; i++)
@@ -295,7 +250,8 @@ void mt_thread_sort()
             args_arr[i].h = myMap.length - 1;
         else
             args_arr[i].h = (i + 1) * epthread - 1;
-        int rc = pthread_create(&threads[i], NULL, thread_merge_divide, (void *)(&args_arr[i]));
+        args_arr[i].mid = (args_arr[i].l + args_arr[i].h) / 2;
+        int rc = pthread_create(&threads[i], NULL, thread_merge_sort, (void *)(&args_arr[i]));
         if (rc)
         {
             printErrMsg("Error while creating threads");
@@ -306,8 +262,8 @@ void mt_thread_sort()
     // wait for every thread to complete their work
     for (int i = 0; i < thread_no; i++)
         pthread_join(threads[i], NULL);
-    printf("after the intial thread sort: \n");
-    printMap(&myMap);
+    // printf("after the intial thread sort: \n");
+    // printMap(&myMap);
     // merge the threads
     int piece_no = thread_no;
     while (piece_no > 1) // loop until everything is merged
@@ -318,47 +274,40 @@ void mt_thread_sort()
         for (int i = 0; i < piece_no; i++)
         {
             // update the args_arr
+            args_arr[i].mid = args_arr[2 * i].h;
             args_arr[i].l = args_arr[2 * i].l;
             args_arr[i].h = args_arr[2 * i + 1].h;
-            int rc = pthread_create(&threads[i], NULL, thread_merge_sort, (void *)(&args_arr[i])); // multi threaded merge
+            
+            int rc = pthread_create(&threads[i], NULL, thread_merge, (void *)(&args_arr[i])); // multi threaded merge
             if (rc)
             {
                 printErrMsg("Error while creating threads");
                 exit(1);
             }
-            // if(flag){ // keep record of the last element
-            //     args_arr[piece_no].l = args_arr[piece_no * 2].l;
-            //     args_arr[piece_no].h = args_arr[piece_no * 2].h;
-            // }
         }
         for (int i = 0; i < piece_no; i++) // wait for threads to complete
             pthread_join(threads[i], NULL);
-
         // merge the last round
-        printMap(&myMap);
+        // printMap(&myMap);
     }
     
     merge(&myMap, args_arr[0].l, (args_arr[0].h + args_arr[0].h + 1)/2, myMap.length - 1);
-    printMap(&myMap);
+    // printMap(&myMap);
 }
 
 int main(int argc, char const *argv[])
 {
-    // const char* filename = argv[1];
-    const char *filename = "output.bin";
-    const char *output = "output2.bin";
-
-    // initialize mymap
+    const char* filename = argv[1];
+    // const char* filename = "./inputfiles/input3.bin";
+    const char* output1 = argv[2];
+    // const char* output1 = "output1.bin";
+    
+    //initialize mymap
     readin(filename);
-    printMap(&myMap);
-    printf("之后\n");
+    // printMap(&myMap);
+    // printf("之后\n");
     mt_thread_sort();
-    printMap(&myMap);
-    // writeOut(output, &myMap);
-    //  freeMap(&myMap);
-    //  printf("终末\n");
-    //  struct map myMap2 = readin(output);
-    //  printf("再读：\n");
-    //  printMap(&myMap2);
+    writeOut(output1, &myMap);
+    // printMap(&myMap);
     return 0;
 }
