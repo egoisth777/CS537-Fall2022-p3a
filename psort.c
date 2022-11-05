@@ -74,14 +74,19 @@ readin(const char* filename)
     // open the file
     int fd = open(filename, O_RDONLY);
     if(fd == -1){ // safety reasons
-        printf("open() syscall failed \n");
-        exit(1);
+        fprintf(stderr, "An error has occurred\n");
+        exit(0);
     }
     
     // map file to memory, and read
     struct stat buffer;
     fstat(fd, &buffer);
     int size = buffer.st_size;
+    if(buffer.st_size <= 0){
+        fprintf(stderr, "An error has occurred\n");
+        close(fd); 
+        exit(0);
+    }
     int *ptr = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
     close(fd);
     
@@ -246,6 +251,7 @@ thread_merge_sort(void* arg){
     // believe in mr. ye
     // mergeDivide(&myMap, left, right);
     merge(&myMap, left, (left + right) / 2, right, arg_sect->num_level_thread);
+    return NULL;
 }
 
 void*
