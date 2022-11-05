@@ -157,8 +157,8 @@ merge(struct map * myMap, int left, int mid, int right, int num_level_threads) {
     int left_current = left;
     int right_current = mid + 1;
 
-    int temp[right - left + 1];
-    int *temp_following[right - left + 1];
+    int *temp = malloc(sizeof(int) * (right - left + 1));
+    int **temp_following = malloc(sizeof(int*) * (right - left + 1));
     int current_index = 0;
 
     // 神的代碼
@@ -192,6 +192,8 @@ merge(struct map * myMap, int left, int mid, int right, int num_level_threads) {
     if (current_finished_threads >= num_level_threads)
         pthread_cond_signal(&condition_wait);
     pthread_mutex_unlock(&lock);
+    free(temp);
+    free(temp_following);
 }
 
 void 
@@ -199,8 +201,13 @@ merge2(struct map * myMap, int left, int mid, int right) {
     int left_current = left;
     int right_current = mid + 1;
 
-    int temp[right - left + 1];
-    int *temp_following[right - left + 1];
+    int *temp = malloc(sizeof(int) * (right - left + 1));
+    int **temp_following = malloc(sizeof(int*) * (right - left + 1));
+    if (temp == NULL || temp_following == NULL)
+    {
+        fprintf(stderr, "An error has occurred\n");
+        exit(0);
+    }
     int current_index = 0;
 
     // 神的代碼
@@ -229,6 +236,8 @@ merge2(struct map * myMap, int left, int mid, int right) {
         //printf("myMap->keys[left]: %d\n", myMap->keys[left]);
         myMap->followings[left++] = temp_following[copyIndex++];
     }
+    free(temp);
+    free(temp_following);
 }
 
 void 
@@ -335,10 +344,10 @@ void mt_thread_sort() {
 int 
 main(int argc, char const *argv[])
 {
-    const char* filename = argv[1];
-    //const char* filename = "inputfiles/6.in";
-    const char* output1 = argv[2];
-    //const char* output1 = "inputfiles/6.out";
+    //const char* filename = argv[1];
+    const char* filename = "inputfiles/8.in";
+    //const char* output1 = argv[2];
+    const char* output1 = "inputfiles/8.out";
 
     //initialize mymap
     readin(filename);
