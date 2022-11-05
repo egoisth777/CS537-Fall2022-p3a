@@ -26,6 +26,14 @@ struct arrsects{
     int num_level_thread; // total number of threads of current level
 };
 
+struct readinarg {
+    int *ptr;
+    int* keys_arr;
+    int** following_darr;
+    int start;
+    int radius;
+};
+
 struct map myMap; // global myMap variable
 int current_finished_threads;
 // mutex: wait for current level child threads
@@ -68,6 +76,30 @@ printErrMsg(char* msg) {
     exit(1);
 }
 
+void* readin_helper(void* args)
+{
+    struct readinarg* argptr = (struct readinarg*) args;
+    int *ptr = argptr->ptr;
+    int* keys_arr = argptr->keys_arr;
+    int** following_darr = argptr->following_darr;
+    int start = argptr->start;
+    int radius = argptr->radius;
+    
+    for(int i = 0; i < radius; i ++)
+    {
+        int key = ptr[start + i];
+        keys_arr[(start + i) / 25] = key;
+        start++;
+        int* following = malloc(24 * sizeof(int));
+        for (int j = 0; j < 96/sizeof(int); j ++) {
+            following[j] = ptr[(start + i) + j];
+        }
+        following_darr[(start + i) / 25] = following;
+        start += 23;
+    }
+    return NULL;
+}
+
 void 
 readin(const char* filename)
 {
@@ -95,28 +127,36 @@ readin(const char* filename)
     int* keys_arr = malloc(rc_no * sizeof(int)); // each 4-byte integer
     int** following_darr = malloc(rc_no * sizeof(int*)); // each 96-byte followings
     
-    for (int i = 0; i < size / 4; i++)
+    int num_thread = get_nprocs();
+    int num_chunk = size / 25;
+    num_thread = num_thread > num_chunk ? num_chunk : num_thread;
+    int fully_modulus = (size / 25) % num_thread;
+    int radius = (size / 25) / num_thread;
+
+    pthread_t threads[num_thread];                       // thread lists
+    struct readinarg args_arr[num_thread];   
+
+    for(int i = 0; i < num_thread; i ++)
     {
-        if (i % 25 == 0) {
-            // DONE: get the key (4-byte int)
-            // printf("key %d is %d\n", i, ptr[i]);
-            int key = ptr[i];
-            keys_arr[i / 25] = key;
-            //printf("i : %d; size: %d\n", i, size);
-            continue;
+        int rc = pthread_create(&threads[i], NULL, thread_merge_divide, (void*)(&args_arr[i]));
+        if(rc) {
+            printErrMsg("Error while creating threads");
+            exit(1);
         }
-        if (i % 25 == 1) {
-            //printf("i : %d; size: %d\n", i, size);
-            // DONE: get the following (96-byte data)
+    }
+    if (fully_modulus > 0) {
+        int rest = size - radius * (num_thread * 25);
+        int rest_start = 123;
+        for(int i = 0; i < radius; i ++)
+        {
+            int key = ptr[start + i];
+            keys_arr[(start + i) / 25] = key;
             int* following = malloc(24 * sizeof(int));
             for (int j = 0; j < 96/sizeof(int); j ++) {
-                following[j] = ptr[i + j];
+                following[j] = ptr[(start + i) + j];
             }
-            following_darr[i / 25] = following;
-            i += 23;
-            continue;
+            following_darr[(start + i) / 25] = following;
         }
-        printErrMsg("Unexpected readin issue");
     }
       
     myMap.length = size / 100;
