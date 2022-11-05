@@ -95,16 +95,18 @@ readin(const char* filename)
     int* keys_arr = malloc(rc_no * sizeof(int)); // each 4-byte integer
     int** following_darr = malloc(rc_no * sizeof(int*)); // each 96-byte followings
     
-    for (int i = 0; ptr[i] != '\0'; i++)
+    for (int i = 0; i < size / 4; i++)
     {
         if (i % 25 == 0) {
             // DONE: get the key (4-byte int)
             // printf("key %d is %d\n", i, ptr[i]);
             int key = ptr[i];
             keys_arr[i / 25] = key;
+            //printf("i : %d; size: %d\n", i, size);
             continue;
         }
         if (i % 25 == 1) {
+            //printf("i : %d; size: %d\n", i, size);
             // DONE: get the following (96-byte data)
             int* following = malloc(24 * sizeof(int));
             for (int j = 0; j < 96/sizeof(int); j ++) {
@@ -132,6 +134,7 @@ void writeOut(const char* filename, struct map *myMap) {
     int *copy = malloc(length * 25 * sizeof(int));
     for (int i = 0; i < length * 25; i ++)
     {
+        //printf("i : %d; \n", i);
         if (i % 25 == 0)
         {
             copy[i] = myMap->keys[i / 25];
@@ -344,10 +347,10 @@ void mt_thread_sort() {
 int 
 main(int argc, char const *argv[])
 {
-    //const char* filename = argv[1];
-    const char* filename = "inputfiles/8.in";
-    //const char* output1 = argv[2];
-    const char* output1 = "inputfiles/8.out";
+    const char* filename = argv[1];
+    //const char* filename = "inputfiles/8.in";
+    const char* output1 = argv[2];
+    //const char* output1 = "inputfiles/8.out";
 
     //initialize mymap
     readin(filename);
