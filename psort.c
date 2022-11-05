@@ -129,7 +129,7 @@ void writeOut(const char* filename, struct map *myMap) {
     fp = fopen(filename, "w");
     // int file = fileno(fp);
     int length = myMap->length;
-    int copy[length * 25];
+    int *copy = malloc(length * 25 * sizeof(int));
     for (int i = 0; i < length * 25; i ++)
     {
         if (i % 25 == 0)
@@ -144,9 +144,10 @@ void writeOut(const char* filename, struct map *myMap) {
             i += 23;
         }
     }
-    fwrite(&copy, 4, length * 25, fp);
+    fwrite(copy, 4, length * 25, fp);
     fflush(fp);
     fclose(fp);
+    free(copy);
 }
 
 // Divide and Conquer method in parallelism
@@ -335,9 +336,10 @@ int
 main(int argc, char const *argv[])
 {
     const char* filename = argv[1];
-    // const char* filename = "input5.bin";
+    //const char* filename = "inputfiles/6.in";
     const char* output1 = argv[2];
-    
+    //const char* output1 = "inputfiles/6.out";
+
     //initialize mymap
     readin(filename);
     // printMap(&myMap);
